@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use  std::env;
 use crate::cli::cli;
 
@@ -5,6 +6,9 @@ mod cli;
 mod lang;
 
 fn main() {
+    // Initiate heap memory
+    let mut memory:HashMap<&str, i64> =HashMap::new();
+
     println!("Malors = Mathematic Logic from Rust.simplify()");
     // Get the command-line arguments
     let args: Vec<String> = env::args().collect();
