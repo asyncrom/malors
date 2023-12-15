@@ -4,7 +4,7 @@ use std::io::Write;
 use crate::cli::LineResultType::{Error, Out};
 use crate::lang::run_line;
 
-pub fn cli(memory: &mut HashMap<&str, f64>) {
+pub fn cli(memory: &mut HashMap<String, f64>) {
     println!("Malors CLI launched");
     loop {
         print!(">>> ");

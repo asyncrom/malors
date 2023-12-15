@@ -4,12 +4,17 @@ use crate::lang::runner::Possible::{PossExpression, PossToken};
 use crate::lang::tokenizer::{Operation, Operator, post_process_operation, Token, tokenize};
 use crate::lang::tokenizer::Token::{Name, Number};
 
-pub fn compile_line(memory: &mut HashMap<&str, f64>, tokens: Vec<Token>) {
+pub fn compile_line(memory: &mut HashMap<String, f64>, tokens: Vec<Token>) {
     //TODO implement functions
     let mut tokens = tokens;
     post_process_operation(&mut tokens);
+    println!("after process: {:?}", tokens.clone());
     let three = three_composer(tokens);
-    println!("three: {:?}", three);
+    if let Possible::PossExpression(expression) = three {
+        let result = expression.solve(memory);
+        println!("result: {}", result)
+    }
+    //println!("three: {:?}", three);
 }
 
 fn var(memory: &mut HashMap<&str, f64>, tokens: Vec<Token>) {
@@ -22,7 +27,7 @@ fn three_composer(tokens: Vec<Token>) -> Possible {
       if i > 0 && i < tokens.len() - 1 {
           let token = tokens[i].clone();
           if let Token::Operator(o) = token {
-              if o.over(version.1.clone()) {
+              if version.1.clone().over(o.clone()) {
                   println!("here");
                   let tokens_copy = tokens.clone();
                   let (mut a, mut b) = tokens_copy.split_at(i);
@@ -72,7 +77,7 @@ impl Expression {
     pub fn new(a: Possible, o:Operator, b:Possible) -> Expression {
         Expression {a: Box::from(a), o, b: Box::from(b)}
     }
-    pub fn solve(&self, mem: &HashMap<String, f64>) -> f64 {
+    pub fn solve(&self, mem: &mut HashMap<String, f64>) -> f64 {
         let a:f64 = match &*self.a {
             PossExpression(expr) => expr.solve(mem),
             PossToken(tok) => {

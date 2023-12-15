@@ -66,6 +66,7 @@ impl Operator {
             Operator::Exponent => 3,
             Operator::Multiply | Operator::Divide => 2,
             Operator::Plus | Operator::Minus => 1,
+            Operator::None => 4,
             _ => 0,
         }
     }
@@ -261,21 +262,6 @@ pub fn post_process_operation(tokens: &mut Vec<Token>) {
         index += 1;
     }
 
-    // Add Operator::Multiply as needed
-    for i in 1..tokens.len() {
-        let add_operator_multiply = match (&tokens[i], &tokens[i - 1]) {
-            (Token::Name(_), Token::Number(_)) => true,
-            (Token::Paren(_), Token::Number(_)) | (Token::Paren(_), Token::Name(_)) => true,
-            (Token::Number(_), Token::Paren(_)) | (Token::Name(_), Token::Paren(_)) => true,
-            (Token::Paren(_), Token::Paren(_)) => true,
-            _ => false,
-        };
-
-        if add_operator_multiply {
-            tokens.insert(i, Token::Operator(Multiply));
-        }
-    }
-
     // Post process parenthesis
     let mut open = Vec::new();
     let mut index_adjustment = 0;  // Track the adjustment in indices due to removals and insertions
@@ -304,15 +290,50 @@ pub fn post_process_operation(tokens: &mut Vec<Token>) {
             open.pop();
         }
     }
-
+    // Check parentheses not in pair, in this case, throw an error
     for token in &mut *tokens {
         if Token::ParenOpen == *token || Token::ParenClose == *token {
             panic!("Mismatched parentheses [2]")
         }
     }
 
-    //TODO: Unwrap nested parentheses recursively
+    //TODO not sure why that works
+    for i in 0..tokens.len() {
+        if let Token::Paren(inner_tokens) = &tokens[i] {
+            let unwrapped_tokens = unwrap_nested_paren(inner_tokens.clone());
+            tokens[i] = Token::Paren(unwrapped_tokens);
+        }
+    }
 
+
+    // Add Operator::Multiply as needed
+    for i in 1..tokens.len() {
+        let add_operator_multiply = match (&tokens[i], &tokens[i - 1]) {
+            (Token::Name(_), Token::Number(_)) => true,
+            (Token::Paren(_), Token::Number(_)) | (Token::Paren(_), Token::Name(_)) => true,
+            (Token::Number(_), Token::Paren(_)) | (Token::Name(_), Token::Paren(_)) => true,
+            (Token::Paren(_), Token::Paren(_)) => true,
+            _ => false,
+        };
+
+        if add_operator_multiply {
+            tokens.insert(i, Token::Operator(Multiply));
+        }
+    }
+
+}
+
+fn unwrap_nested_paren(tokens: Vec<Token>) -> Vec<Token> {
+    if tokens.len() == 1 {
+        // If there's only one token inside the parentheses, unwrap it
+        match &tokens[0] {
+            Token::Paren(inner_tokens) => unwrap_nested_paren(inner_tokens.clone()),
+            _ => tokens,
+        }
+    } else {
+        // If there are multiple tokens inside the parentheses, return them as-is
+        tokens
+    }
 }
 
 fn is_valid_preceding_token(token: &Token) -> bool {
