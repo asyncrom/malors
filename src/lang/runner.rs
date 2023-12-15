@@ -1,30 +1,67 @@
 use std::collections::HashMap;
+use std::thread;
 use crate::lang::runner::Possible::{PossExpression, PossToken};
-use crate::lang::tokenizer::{Operation, Operator, Token, tokenize};
+use crate::lang::tokenizer::{Operation, Operator, post_process_operation, Token, tokenize};
 use crate::lang::tokenizer::Token::{Name, Number};
 
-pub fn run_line(memory: &mut HashMap<&str, f64>, tokens: Vec<Token>) {
+pub fn compile_line(memory: &mut HashMap<&str, f64>, tokens: Vec<Token>) {
     //TODO implement functions
-    if tokens.is_empty() {
-        return;
-    }
-
-    ;
+    let mut tokens = tokens;
+    post_process_operation(&mut tokens);
+    let three = three_composer(tokens);
+    println!("three: {:?}", three);
 }
 
 fn var(memory: &mut HashMap<&str, f64>, tokens: Vec<Token>) {
 
 }
 
-fn three_composer(tokens: Vec<Token>) {
-    //TODO Use Constructor to compose three from top to bottom, then transform into Possible tree !
-}
+fn three_composer(tokens: Vec<Token>) -> Possible {
+    let mut version: (Vec<Token>, Operator, Vec<Token>) = (vec![], Operator::None, vec![]);
+    for i in 0..tokens.len() {
+      if i > 0 && i < tokens.len() - 1 {
+          let token = tokens[i].clone();
+          if let Token::Operator(o) = token {
+              if o.over(version.1.clone()) {
+                  println!("here");
+                  let tokens_copy = tokens.clone();
+                  let (mut a, mut b) = tokens_copy.split_at(i);
+                  let a = Vec::from(a);
+                  let b: Vec<Token> = Vec::from(&b[1..]);
+                  version = (a, o, b);
+              }
+          }
+      }
+    }
 
-pub struct Constructor {
-    a: Vec<Token>,
-    o: Operator,
-    b: Vec<Token>,
+    println!("version: {:?}", version);
+    let a =
+        if version.0.len() == 1 {
+            if let Some(Token::Paren(toks)) = version.0.get(0) {
+                if toks.len() == 1 {
+                    Possible::token(toks.get(0).unwrap().clone())
+                } else {
+                    three_composer(toks.clone())
+                }
+            } else {
+                Possible::token(version.0.get(0).unwrap().clone())
+            }
+        } else {
+            three_composer(version.0)
+        };
+    let b =
+        if version.2.len() == 1 {
+            if let Some(Token::Paren(toks)) = version.2.get(0) {
+                three_composer(toks.clone())
+            } else {
+                Possible::token(version.2.get(0).unwrap().clone())
+            }
+        } else {
+            three_composer(version.2)
+        };
+    Possible::expression(Expression::new(a, version.1, b))
 }
+#[derive(Debug)]
 pub struct Expression {
     a: Box<Possible>,
     o: Operator,
@@ -62,6 +99,7 @@ impl Expression {
     }
 }
 
+#[derive(Debug)]
 pub enum Possible {
     PossExpression(Box<Expression>),
     PossToken(Token)

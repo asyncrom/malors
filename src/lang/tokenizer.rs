@@ -27,7 +27,7 @@ pub enum Compare {
     GreaterThanOrEqual,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Operator {
     Plus,
     Minus,
@@ -35,6 +35,7 @@ pub enum Operator {
     Divide,
     Exponent,
     Factorial,
+    None,
 }
 
 impl Operator {
@@ -52,6 +53,20 @@ impl Operator {
             }
             Operator::Exponent => a.powf(b),
             Operator::Factorial => panic!("Factorials not supported"), //TODO
+            Operator::None => panic!("Can't be none") //TODO
+        }
+    }
+
+    pub fn over(&self, b: Operator) -> bool {
+        self.priority() >= b.priority()
+    }
+
+    fn priority(&self) -> i32 {
+        match self {
+            Operator::Exponent => 3,
+            Operator::Multiply | Operator::Divide => 2,
+            Operator::Plus | Operator::Minus => 1,
+            _ => 0,
         }
     }
 }
@@ -105,7 +120,7 @@ pub(crate) fn tokenize(input: &str) -> Vec<Token> {
         tokens.push(tokenize_value(&current_token));
     }
 
-    post_process(&mut tokens);
+    //post_process(&mut tokens);
 
     tokens
 }
@@ -141,7 +156,13 @@ fn tokenize_operator(operator: char, tokens: &mut Vec<Token>) -> Token {
     match operator {
         '+' => Token::Operator(Operator::Plus),
         '-' => Token::Operator(Operator::Minus),
-        '*' => Token::Operator(Operator::Multiply),
+        '*' => match tokens.last() {
+            Some(Token::Operator(Operator::Multiply)) => {
+                tokens.pop();
+                Token::Operator(Operator::Exponent)
+            }
+            _=> Token::Operator(Operator::Multiply)
+        },
         '/' => Token::Operator(Operator::Divide),
         '^' => Token::Operator(Operator::Exponent),
         '=' => match tokens.last() {
@@ -187,6 +208,44 @@ fn tokenize_operator(operator: char, tokens: &mut Vec<Token>) -> Token {
 }
 
 fn post_process(tokens: &mut Vec<Token>) {
+
+    // Post process parenthesis
+    let mut open = Vec::new();
+    let mut index_adjustment = 0;  // Track the adjustment in indices due to removals and insertions
+
+    for i in 0..tokens.len() {
+        let adjusted_index = i - index_adjustment;
+        let token = tokens[adjusted_index].clone();
+
+        if let Token::ParenOpen = token {
+            open.push(adjusted_index);
+        } else if let Token::ParenClose = token {
+            let start = *open.last().expect("Mismatched parentheses [1]");
+            let end = adjusted_index;
+            let mut extracted: Vec<Token> = tokens.drain(start..=end).collect();
+
+            // Adjust indices for the removals
+            index_adjustment += extracted.len() - 1;
+
+            // Remove the first and last elements (parentheses)
+            extracted.pop();
+            extracted.remove(0);
+
+            // Insert the Paren token at the original start index
+            tokens.insert(start, Token::Paren(extracted));
+
+            open.pop();
+        }
+    }
+
+    for token in &mut *tokens {
+        if Token::ParenOpen == *token || Token::ParenClose == *token {
+            panic!("Mismatched parentheses [2]")
+        }
+    }
+}
+
+pub fn post_process_operation(tokens: &mut Vec<Token>) {
     // Post process minus signs
     let mut index = 0;
     while index < tokens.len() {
@@ -200,6 +259,21 @@ fn post_process(tokens: &mut Vec<Token>) {
         }
 
         index += 1;
+    }
+
+    // Add Operator::Multiply as needed
+    for i in 1..tokens.len() {
+        let add_operator_multiply = match (&tokens[i], &tokens[i - 1]) {
+            (Token::Name(_), Token::Number(_)) => true,
+            (Token::Paren(_), Token::Number(_)) | (Token::Paren(_), Token::Name(_)) => true,
+            (Token::Number(_), Token::Paren(_)) | (Token::Name(_), Token::Paren(_)) => true,
+            (Token::Paren(_), Token::Paren(_)) => true,
+            _ => false,
+        };
+
+        if add_operator_multiply {
+            tokens.insert(i, Token::Operator(Multiply));
+        }
     }
 
     // Post process parenthesis
@@ -237,20 +311,8 @@ fn post_process(tokens: &mut Vec<Token>) {
         }
     }
 
-    // Add Operator::Multiply as needed
-    for i in 1..tokens.len() {
-        let add_operator_multiply = match (&tokens[i], &tokens[i - 1]) {
-            (Token::Name(_), Token::Number(_)) => true,
-            (Token::Paren(_), Token::Number(_)) | (Token::Paren(_), Token::Name(_)) => true,
-            (Token::Number(_), Token::Paren(_)) | (Token::Name(_), Token::Paren(_)) => true,
-            (Token::Paren(_), Token::Paren(_)) => true,
-            _ => false,
-        };
+    //TODO: Unwrap nested parentheses recursively
 
-        if add_operator_multiply {
-            tokens.insert(i, Token::Operator(Multiply));
-        }
-    }
 }
 
 fn is_valid_preceding_token(token: &Token) -> bool {

@@ -1,9 +1,10 @@
+use std::collections::HashMap;
 use std::io;
 use std::io::Write;
 use crate::cli::LineResultType::{Error, Out};
 use crate::lang::run_line;
 
-pub fn cli() {
+pub fn cli(memory: &mut HashMap<&str, f64>) {
     println!("Malors CLI launched");
     loop {
         print!(">>> ");
@@ -15,7 +16,7 @@ pub fn cli() {
         } else if input.trim().is_empty() {
             // Do nothing
         } else {
-            let result = run_line(input.as_str());
+            let result = run_line(input.as_str(), memory);
             if result.res_type == Out {
                 println!("{}", result.string)
             } else if result.res_type == Error {

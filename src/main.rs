@@ -7,7 +7,7 @@ mod lang;
 
 fn main() {
     // Initiate heap memory
-    let mut memory:HashMap<&str, i64> =HashMap::new();
+    let mut memory:HashMap<&str, f64> =HashMap::new();
 
     println!("Malors = Mathematic Logic from Rust.simplify()");
     // Get the command-line arguments
@@ -15,6 +15,6 @@ fn main() {
 
     // Check if there are no arguments (other than the program name)
     if args.len() == 1 {
-        cli()
+        cli(&mut memory);
     }
 }
