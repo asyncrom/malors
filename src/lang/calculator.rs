@@ -10,7 +10,7 @@ use crate::lang::tokenizer::Token::{Name, Number};
 pub fn calculate(tokens: Vec<Token>) -> f64 {
     // Post process the tokens to add implicit multiplications, remove unnecessary parenthesis and determine minus signs
     let tokens = post_process_operation(tokens);
-
+    println!("post pro {:?}", tokens);
     // Compose a three with branch A and branch B possibles and the node an operation
     // A possible is either an Expression that needs to be resolved or a value
     let three = three_composer(tokens);
@@ -80,6 +80,22 @@ fn post_process_operation(tokens: Vec<Token>) -> Vec<Token> {
         }
     }
 
+    // Add Operator::Multiply as needed
+    for i in 1..tokens.len() {
+        let add_operator_multiply = match (&tokens[i], &tokens[i - 1]) {
+            (Token::Name(_), Token::Number(_)) => true,
+            (Token::Name(_), Token::Name(_)) => true,
+            (Token::Number(_), Token::Number(_)) => true,
+            (Token::Paren(_), Token::Number(_)) | (Token::Paren(_), Token::Name(_)) => true,
+            (Token::Number(_), Token::Paren(_)) | (Token::Name(_), Token::Paren(_)) => true,
+            (Token::Paren(_), Token::Paren(_)) => true,
+            _ => false,
+        };
+
+        if add_operator_multiply {
+            tokens.insert(i, Token::Operator(Multiply));
+        }
+    }
     //TODO not sure why that works
     //Unwrap nested parentheses recursively
     let mut i = 0;
@@ -96,21 +112,6 @@ fn post_process_operation(tokens: Vec<Token>) -> Vec<Token> {
         i += 1;
     }
 
-
-    // Add Operator::Multiply as needed
-    for i in 1..tokens.len() {
-        let add_operator_multiply = match (&tokens[i], &tokens[i - 1]) {
-            (Token::Name(_), Token::Number(_)) => true,
-            (Token::Paren(_), Token::Number(_)) | (Token::Paren(_), Token::Name(_)) => true,
-            (Token::Number(_), Token::Paren(_)) | (Token::Name(_), Token::Paren(_)) => true,
-            (Token::Paren(_), Token::Paren(_)) => true,
-            _ => false,
-        };
-
-        if add_operator_multiply {
-            tokens.insert(i, Token::Operator(Multiply));
-        }
-    }
     tokens
 }
 fn is_valid_preceding_token(token: &Token) -> bool {
@@ -193,7 +194,8 @@ fn three_composer(tokens: Vec<Token>) -> Possible {
         }
     }
 
-    println!("version: {:?}", version);
+
+    //println!("version: {:?}", version);
     let a =
         if version.0.len() == 1 {
             if let Some(Token::Paren(toks)) = version.0.get(0) {

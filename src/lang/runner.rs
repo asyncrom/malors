@@ -1,69 +1,61 @@
-// use std::collections::HashMap;
-// use std::thread;
-// use crate::lang::calculator::{Expression, Possible};
-// use crate::lang::runner::Possible::{PossExpression, PossToken};
-// use crate::lang::tokenizer::{Operation, Operator, post_process_operation, Token, tokenize};
-// use crate::lang::tokenizer::Token::{Name, Number};
-//
-// pub fn compile_line(memory: &mut HashMap<String, f64>, tokens: Vec<Token>) {
-//     //TODO implement functions
-//     let mut tokens = tokens;
-//     post_process_operation(&mut tokens);
-//     println!("after process: {:?}", tokens.clone());
-//     let three = three_composer(tokens);
-//     if let Possible::PossExpression(expression) = three {
-//         let result = expression.solve(memory);
-//         println!("result: {}", result)
-//     }
-//     //println!("three: {:?}", three);
-// }
-//
-// fn var(memory: &mut HashMap<&str, f64>, tokens: Vec<Token>) {
-//
-// }
-//
-// fn three_composer(tokens: Vec<Token>) -> Possible {
-//     let mut version: (Vec<Token>, Operator, Vec<Token>) = (vec![], Operator::None, vec![]);
-//     for i in 0..tokens.len() {
-//       if i > 0 && i < tokens.len() - 1 {
-//           let token = tokens[i].clone();
-//           if let Token::Operator(o) = token {
-//               if version.1.clone().over(o.clone()) {
-//                   println!("here");
-//                   let tokens_copy = tokens.clone();
-//                   let (mut a, mut b) = tokens_copy.split_at(i);
-//                   let a = Vec::from(a);
-//                   let b: Vec<Token> = Vec::from(&b[1..]);
-//                   version = (a, o, b);
-//               }
-//           }
-//       }
-//     }
-//
-//     println!("version: {:?}", version);
-//     let a =
-//         if version.0.len() == 1 {
-//             if let Some(Token::Paren(toks)) = version.0.get(0) {
-//                 if toks.len() == 1 {
-//                     Possible::token(toks.get(0).unwrap().clone())
-//                 } else {
-//                     three_composer(toks.clone())
-//                 }
-//             } else {
-//                 Possible::token(version.0.get(0).unwrap().clone())
-//             }
-//         } else {
-//             three_composer(version.0)
-//         };
-//     let b =
-//         if version.2.len() == 1 {
-//             if let Some(Token::Paren(toks)) = version.2.get(0) {
-//                 three_composer(toks.clone())
-//             } else {
-//                 Possible::token(version.2.get(0).unwrap().clone())
-//             }
-//         } else {
-//             three_composer(version.2)
-//         };
-//     Possible::expression(Expression::new(a, version.1, b))
-// }
+use std::collections::HashMap;
+use std::ops::Add;
+use crate::cli::LineResult;
+use crate::lang::calculator::calculate;
+use crate::lang::line_type::LineType;
+use crate::lang::tokenizer::{Operation, Token};
+use crate::lang::tokenizer::Token::Number;
+
+pub fn run(memory: &mut HashMap<String, f64>, line_type: LineType) -> LineResult {
+    match line_type {
+        LineType::Nothing => {
+
+        }
+        LineType::Out(out) => {
+            let mut result = "".to_string();
+            for string in out {
+                result.push_str(":");
+                let num = memory.get(&string).expect("Var not found in memory");
+                result.push_str(&*format!("{}", num));
+            }
+            return LineResult::out(result)
+        }
+        LineType::VarOperate(var, op, ex) => {
+            let num = calculate(replace_var(memory,ex));
+            match op {
+                Operation::Assign => {
+                    memory.insert(var, num);
+                }
+                Operation::AddVar => {
+                    let ancient = memory.get(&var).expect("Var not found in memory");
+                    memory.insert(var, ancient + num);
+                }
+                Operation::SubtractVar => {
+                    let ancient = memory.get(&var).expect("Var not found in memory");
+                    memory.insert(var, ancient - num);
+                }
+                Operation::MultiplyVar => {
+                    let ancient = memory.get(&var).expect("Var not found in memory");
+                    memory.insert(var, ancient * num);
+                }
+                Operation::DivideVar => {
+                    let ancient = memory.get(&var).expect("Var not found in memory");
+                    memory.insert(var, ancient / num);
+                }
+            }
+        }
+        LineType::If(_, _, _, _) => {}
+        LineType::While(_, _, _, _) => {}
+    }
+    LineResult::none()
+}
+
+fn replace_var(memory: &mut HashMap<String, f64>, tokens : Vec<Token>) -> Vec<Token> {
+    let mut tokens = tokens;
+    for i in 0..tokens.len() {
+        if let Token::Name(name) = tokens.get(i).unwrap() {
+            tokens[i] = Number(*memory.get(name).expect("Var not found in memory"));
+        }
+    }
+    return tokens;
+}

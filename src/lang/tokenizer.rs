@@ -1,3 +1,6 @@
+use std::f64::consts::*;
+use crate::lang::tokenizer::State::{No, Num, Special, Word};
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
     Name(String),
@@ -82,123 +85,118 @@ pub enum Keyword {
     While,
 }
 
-pub(crate) fn tokenize(input: &str) -> Vec<Token> {
+#[derive(Debug, Clone, PartialEq)]
+enum State {
+    No, Word, Num, Special
+}
+
+pub(crate) fn tokenize2(input: &str) -> Vec<Token> {
     let mut tokens = Vec::new();
-    let mut current_token = String::new();
+    let mut current_string = String::new();
+    let mut state = No; // Building a word
 
-    for c in input.chars() {
-        if c.is_alphanumeric() || c == '.' || c == '_' {
-            current_token.push(c);
-        } else {
-            if !current_token.is_empty() {
-                // Check if the current token starts with a number
-                let mut chars = current_token.chars();
-                if let Some(first_char) = chars.next() {
-                    if first_char.is_numeric() {
-                        let rest_of_token: String = chars.collect();
-                        tokens.push(Token::Number(first_char.to_digit(10).unwrap() as f64));
-                        current_token = rest_of_token;
-                    } else {
-                        tokens.push(tokenize_value(&current_token));
-                        current_token.clear();
-                    }
-                }
+    for char in input.chars() {
+        if state == Word {
+            if !char.is_whitespace() && (char.is_alphanumeric() || char == '_') {
+                current_string.push(char)
+            } else {
+                tokens.push(tokenize_name(current_string.clone()));
+                current_string = String::new();
+                state = No;
             }
+        }
+        if state == Num {
+            if char.is_numeric() {
+                current_string.push(char)
+            } else if char == '.' {
+                if current_string.contains('.') {
+                    panic!("Number with two points is not possible")
+                } else {
+                    current_string.push(char);
+                }
+            } else {
+                tokens.push(tokenize_num(current_string.clone()));
+                current_string = String::new();
+                state = No;
+            }
+        }
+        if state == Special {
+            if is_special(char) {
+                current_string.push(char)
+            } else {
+                tokens.push(tokenize_special(current_string.clone()));
+                current_string = String::new();
+                state = No;
+            }
+        }
+        if state == No {
+            if char.is_alphanumeric() {
+                if char.is_alphabetic() {
+                    current_string.push(char);
+                    state = Word;
+                } else if char.is_numeric() {
+                    current_string.push(char);
+                    state = Num;
+                }
+            } else if char == '(' {
+                tokens.push(Token::ParenOpen);
+            } else if char == ')' {
+                tokens.push(Token::ParenClose);
+            } else if char == ':' {
+                tokens.push(Token::Colon);
+            } else if is_special(char) {
+                current_string.push(char);
+                state = Special;
+            } else if char.is_whitespace() || char.is_ascii_whitespace() {
 
-            if !c.is_whitespace() {
-                let tok = tokenize_non_alphanumeric(c, &mut tokens);
-                tokens.push(tok);
+            } else {
+                panic!("Incorrect char: {}", char)
             }
         }
     }
-
-    if !current_token.is_empty() {
-        tokens.push(tokenize_value(&current_token));
-    }
-
-    //post_process(&mut tokens);
 
     tokens
 }
 
-
-fn tokenize_value(value: &str) -> Token {
-    match value {
-        "if" => Token::Key(Keyword::If),
-        "while" => Token::Key(Keyword::While),
-        "PI" => Token::Number(std::f64::consts::PI),
-        "e" => Token::Number(std::f64::consts::E),
-        _ => {
-            if let Ok(number) = value.parse::<f64>() {
-                Token::Number(number)
-            } else {
-                Token::Name(value.into())
-            }
+fn tokenize_name(name: String) -> Token {
+        match &*name {
+            "if" => Token::Key(Keyword::If),
+            "wl" | "while" => Token::Key(Keyword::While),
+            "del" => Token::Key(Keyword::While),
+            "PI" => Token::Number(PI),
+            "e" => Token::Number(E),
+            _ => Token::Name(name),
         }
+}
+
+fn tokenize_num(name: String) -> Token {
+    Token::Number(name.parse::<f64>().expect("Unable to convert to num"))
+}
+
+fn tokenize_special(name: String) -> Token {
+    match &*name {
+        "+" => Token::Operator(Operator::Plus),
+        "-" => Token::Operator(Operator::Minus),
+        "*" => Token::Operator(Operator::Multiply),
+        "/" => Token::Operator(Operator::Divide),
+        "**" | "^" => Token::Operator(Operator::Exponent),
+
+        "==" => Token::Compare(Compare::Equal),
+        "<" => Token::Compare(Compare::LessThan),
+        "<=" => Token::Compare(Compare::LessThanOrEqual),
+        ">" => Token::Compare(Compare::GreaterThan),
+        ">=" => Token::Compare(Compare::GreaterThanOrEqual),
+
+        "=" => Token::Operation(Operation::Assign),
+        "+=" => Token::Operation(Operation::AddVar),
+        "-=" => Token::Operation(Operation::SubtractVar),
+        "*=" => Token::Operation(Operation::MultiplyVar),
+        "/=" => Token::Operation(Operation::DivideVar),
+
+        _ => panic!("operation {} not supported", name)
     }
 }
 
-fn tokenize_non_alphanumeric(c: char, tokens: &mut Vec<Token>) -> Token {
-    match c {
-        ':' => Token::Colon,
-        '+' | '-' | '*' | '/' | '!' | '<' | '>' | '^' | '='   => tokenize_operator(c, tokens),
-        '(' => Token::ParenOpen,
-        ')' => Token::ParenClose,
-        _ => panic!("Unsupported character: {}", c),
-    }
-}
-
-fn tokenize_operator(operator: char, tokens: &mut Vec<Token>) -> Token {
-    match operator {
-        '+' => Token::Operator(Operator::Plus),
-        '-' => Token::Operator(Operator::Minus),
-        '*' => match tokens.last() {
-            Some(Token::Operator(Operator::Multiply)) => {
-                tokens.pop();
-                Token::Operator(Operator::Exponent)
-            }
-            _=> Token::Operator(Operator::Multiply)
-        },
-        '/' => Token::Operator(Operator::Divide),
-        '^' => Token::Operator(Operator::Exponent),
-        '=' => match tokens.last() {
-            Some(&Token::Compare(Compare::LessThan)) => {
-                tokens.pop();
-                Token::Compare(Compare::LessThanOrEqual)
-            }
-            Some(&Token::Compare(Compare::GreaterThan)) => {
-                tokens.pop();
-                Token::Compare(Compare::GreaterThanOrEqual)
-            }
-            Some(&Token::Compare(Compare::NotEqual)) => {
-                tokens.pop();
-                Token::Compare(Compare::NotEqual)
-            }
-            Some(&Token::Operator(Operator::Plus)) => {
-                tokens.pop();
-                Token::Operation(Operation::AddVar)
-            }
-            Some(&Token::Operator(Operator::Minus)) => {
-                tokens.pop();
-                Token::Operation(Operation::SubtractVar)
-            }
-            Some(&Token::Operator(Operator::Multiply)) => {
-                tokens.pop();
-                Token::Operation(Operation::MultiplyVar)
-            }
-            Some(&Token::Operator(Operator::Divide)) => {
-                tokens.pop();
-                Token::Operation(Operation::DivideVar)
-            }
-            Some(&Token::Operation(Operation::Assign)) => {
-                tokens.pop();
-                Token::Compare(Compare::Equal)
-            }
-            _ => Token::Operation(Operation::Assign),
-        },
-        '!' => Token::Operator(Operator::Factorial),
-        '<' => Token::Compare(Compare::LessThan),
-        '>' => Token::Compare(Compare::GreaterThan),
-        _ => panic!("Unsupported operator: {}", operator),
-    }
+fn is_special(c: char) -> bool {
+    c == '<' || c == '>' || c == '=' || c == '*' || c == '/' || c == '-' || c == '+' || c == '^'
 }
