@@ -20,6 +20,12 @@ pub fn calculate(tokens: Vec<Token>) -> f64 {
     let mut result = None;
     if let Possible::PossExpression(expression) = three {
         result = Some(expression.solve());
+    } else if let Possible::PossToken(tok) = three {
+        if let Number(num) = tok {
+            result = Some(num)
+        } else {
+            panic!("Invalid token [27]")
+        }
     }
     result.expect("Invalide result in calculate")
 }
@@ -112,7 +118,30 @@ fn post_process_operation(tokens: Vec<Token>) -> Vec<Token> {
         i += 1;
     }
 
+    // for i in 0..tokens.len() {
+    //     let current = tokens.get(i).unwrap();
+    //     if let Token::Paren(inner_tokens) = current {
+    //         tokens[i] = remove_paren(current.clone());
+    //     }
+    // }
+
     tokens
+}
+
+fn remove_paren(token: Token) -> Token {
+    if let Token::Paren(ref inner_tokens) = token {
+        if inner_tokens.len() == 1 {
+            if let Token::Paren(_) = inner_tokens.get(0).unwrap() {
+                return remove_paren(inner_tokens.get(0).unwrap().clone())
+            } else {
+                return inner_tokens.get(0).unwrap().clone()
+            }
+        } else {
+            return token.clone()
+        }
+    } else {
+        panic!("Unexpected Error [137]")
+    }
 }
 fn is_valid_preceding_token(token: &Token) -> bool {
     match token {
@@ -164,7 +193,7 @@ impl Expression {
 #[derive(Debug)]
 pub enum Possible {
     PossExpression(Box<Expression>),
-    PossToken(Token)
+    PossToken(Token),
 }
 
 impl Possible {
@@ -177,6 +206,9 @@ impl Possible {
 }
 
 fn three_composer(tokens: Vec<Token>) -> Possible {
+    if tokens.len() == 1 {
+        return Possible::token(tokens.get(0).unwrap().clone())
+    }
     let mut version: (Vec<Token>, Operator, Vec<Token>) = (vec![], Operator::None, vec![]);
     for i in 0..tokens.len() {
         if i > 0 && i < tokens.len() - 1 {
