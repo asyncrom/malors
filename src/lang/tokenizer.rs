@@ -25,6 +25,20 @@ pub enum Compare {
     GreaterThanOrEqual,
 }
 
+impl Compare {
+    pub fn compare(&self, a:f64, b:f64) -> bool {
+        match *&self {
+            Compare::Equal => {return a == b}
+            Compare::NotEqual => {return  a != b}
+            Compare::LessThan => { return a < b}
+            Compare::GreaterThan => {return a > b}
+            Compare::LessThanOrEqual => {return a <= b}
+            Compare::GreaterThanOrEqual => {return a >= b}
+        }
+    }
+
+}
+
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Operator {
     Plus,
@@ -37,21 +51,21 @@ pub enum Operator {
 }
 
 impl Operator {
-    pub fn operate(&self, a: f64, b: f64) -> f64 {
+    pub fn operate(&self, a: f64, b: f64) -> Result<f64, String> {
         match self {
-            Operator::Plus => a + b,
-            Operator::Minus => a - b,
-            Operator::Multiply => a * b,
+            Operator::Plus => Ok(a + b),
+            Operator::Minus => Ok(a - b),
+            Operator::Multiply => Ok(a * b),
             Operator::Divide => {
                 if b != 0.0 {
-                    a / b
+                   Ok( a / b)
                 } else {
-                    panic!("Division by zero");
+                    Err(format!("Division by zero: {}/{}", a, b))
                 }
             }
-            Operator::Exponent => a.powf(b),
-            Operator::Factorial => panic!("Factorials not supported"), //TODO
-            Operator::None => panic!("Can't be none") //TODO
+            Operator::Exponent => Ok(a.powf(b)),
+            Operator::Factorial => Err("Factorials not supported for now".into()), //TODO
+            Operator::None => Err("Inter: can't be none".into()) //TODO
         }
     }
 
@@ -90,7 +104,7 @@ enum State {
     No, Word, Num, Special
 }
 
-pub(crate) fn tokenize2(input: &str) -> Vec<Token> {
+pub(crate) fn tokenize2(input: &str) -> Result<Vec<Token>, String> {
     let mut tokens = Vec::new();
     let mut current_string = String::new();
     let mut state = No; // Building a word
@@ -110,7 +124,7 @@ pub(crate) fn tokenize2(input: &str) -> Vec<Token> {
                 current_string.push(char)
             } else if char == '.' {
                 if current_string.contains('.') {
-                    panic!("Number with two points is not possible")
+                    return Err("Number with two points is not possible".into());
                 } else {
                     current_string.push(char);
                 }
@@ -124,14 +138,14 @@ pub(crate) fn tokenize2(input: &str) -> Vec<Token> {
             if is_special(char) {
                 current_string.push(char)
             } else {
-                tokens.push(tokenize_special(current_string.clone()));
+                tokens.push(tokenize_special(current_string.clone())?);
                 current_string = String::new();
                 state = No;
             }
         }
         if state == No {
-            if char.is_alphanumeric() {
-                if char.is_alphabetic() {
+            if char.is_alphanumeric() || char == '_' {
+                if char.is_alphabetic() || char == '_' {
                     current_string.push(char);
                     state = Word;
                 } else if char.is_numeric() {
@@ -150,12 +164,12 @@ pub(crate) fn tokenize2(input: &str) -> Vec<Token> {
             } else if char.is_whitespace() || char.is_ascii_whitespace() {
 
             } else {
-                panic!("Incorrect char: {}", char)
+                return Err(format!("Incorrect char: {}", char))
             }
         }
     }
 
-    tokens
+    Ok(tokens)
 }
 
 fn tokenize_name(name: String) -> Token {
@@ -173,8 +187,8 @@ fn tokenize_num(name: String) -> Token {
     Token::Number(name.parse::<f64>().expect("Unable to convert to num"))
 }
 
-fn tokenize_special(name: String) -> Token {
-    match &*name {
+fn tokenize_special(name: String) -> Result<Token, String> {
+    Ok(match &*name {
         "+" => Token::Operator(Operator::Plus),
         "-" => Token::Operator(Operator::Minus),
         "*" => Token::Operator(Operator::Multiply),
@@ -193,8 +207,8 @@ fn tokenize_special(name: String) -> Token {
         "*=" => Token::Operation(Operation::MultiplyVar),
         "/=" => Token::Operation(Operation::DivideVar),
 
-        _ => panic!("operation {} not supported", name)
-    }
+        _ => return Err(format!("operation {} not supported", name))
+    })
 }
 
 fn is_special(c: char) -> bool {

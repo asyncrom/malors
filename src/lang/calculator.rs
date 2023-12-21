@@ -2,18 +2,18 @@
 The calculator takes an expression only made of Num(num) and Operator and it returns the result as an f64
  */
 
+use std::ops::Index;
 use crate::lang::calculator::Possible::{PossExpression, PossToken};
 use crate::lang::tokenizer::{Operator, Token};
 use crate::lang::tokenizer::Operator::Multiply;
 use crate::lang::tokenizer::Token::{Name, Number};
 
-pub fn calculate(tokens: Vec<Token>) -> f64 {
+pub fn calculate(tokens: Vec<Token>) -> Result<f64, String> {
     // Post process the tokens to add implicit multiplications, remove unnecessary parenthesis and determine minus signs
     let tokens = post_process_operation(tokens);
-    println!("post pro {:?}", tokens);
     // Compose a three with branch A and branch B possibles and the node an operation
     // A possible is either an Expression that needs to be resolved or a value
-    let three = three_composer(tokens);
+    let three = three_composer(tokens.clone()?);
 
     // Resolve the three by propagating the solve methode
     // If the expression given was correct, it shouldn't be a PossToken
@@ -22,19 +22,23 @@ pub fn calculate(tokens: Vec<Token>) -> f64 {
         result = Some(expression.solve());
     } else if let Possible::PossToken(tok) = three {
         if let Number(num) = tok {
-            result = Some(num)
+            result = Some(Ok(num))
         } else {
-            panic!("Invalid token [27]")
+            return Err(format!("Invalid token in calculation: {:?}, is not a number", tok))
         }
     }
-    result.expect("Invalide result in calculate")
+    if let Some(res) = result {
+        return Ok(res?)
+    } else {
+        return Err(format!("Invalid result of calculation: {:?}", tokens))
+    }
 }
 /*
 
 Post process functions
 
  */
-fn post_process_operation(tokens: Vec<Token>) -> Vec<Token> {
+fn post_process_operation(tokens: Vec<Token>) -> Result<Vec<Token>, String> {
     let mut tokens = tokens;
     // Post process minus signs
     let mut index = 0;
@@ -62,7 +66,10 @@ fn post_process_operation(tokens: Vec<Token>) -> Vec<Token> {
         if let Token::ParenOpen = token {
             open.push(adjusted_index);
         } else if let Token::ParenClose = token {
-            let start = *open.last().expect("Mismatched parentheses [1]");
+            let start = match open.last() {
+                None => {return Err("Mismatched parenthesis [1]".into())}
+                Some(num) => {*num}
+            };
             let end = adjusted_index;
             let mut extracted: Vec<Token> = tokens.drain(start..=end).collect();
 
@@ -82,7 +89,7 @@ fn post_process_operation(tokens: Vec<Token>) -> Vec<Token> {
     // Check parentheses not in pair, in this case, throw an error
     for token in &mut *tokens {
         if Token::ParenOpen == *token || Token::ParenClose == *token {
-            panic!("Mismatched parentheses [2]")
+            return Err("Mismatched parenthesis [2]".into())
         }
     }
 
@@ -125,22 +132,22 @@ fn post_process_operation(tokens: Vec<Token>) -> Vec<Token> {
     //     }
     // }
 
-    tokens
+    Ok(tokens)
 }
 
-fn remove_paren(token: Token) -> Token {
+fn remove_paren(token: Token) -> Result<Token, String> {
     if let Token::Paren(ref inner_tokens) = token {
         if inner_tokens.len() == 1 {
             if let Token::Paren(_) = inner_tokens.get(0).unwrap() {
                 return remove_paren(inner_tokens.get(0).unwrap().clone())
             } else {
-                return inner_tokens.get(0).unwrap().clone()
+                return Ok(inner_tokens.get(0).unwrap().clone())
             }
         } else {
-            return token.clone()
+            return Ok( token.clone())
         }
     } else {
-        panic!("Unexpected Error [137]")
+        return Err("Unexpected Error [137]".to_string())
     }
 }
 fn is_valid_preceding_token(token: &Token) -> bool {
@@ -165,28 +172,28 @@ impl Expression {
     pub fn new(a: Possible, o:Operator, b: Possible) -> Expression {
         Expression {a: Box::from(a), o, b: Box::from(b)}
     }
-    pub fn solve(&self) -> f64 {
+    pub fn solve(&self) -> Result<f64, String> {
         let a:f64 = match &*self.a {
             PossExpression(expr) => expr.solve(),
             PossToken(tok) => {
-                match tok {
+                Ok(match tok {
                     Number(num) => *num,
-                    _ => panic!("Invalid token in expression")
-                }
+                    _ => return Err("Invalid token in expression".into())
+                })
             }
-        };
+        }?;
         let b:f64 = match &*self.b {
             PossExpression(expr) => expr.solve(),
             PossToken(tok) => {
-                match tok {
+                Ok(match tok {
                     Number(num) => *num,
-                    _ => panic!("Invalid token in expression")
-                }
+                    _ => return Err("Invalid token in expression".into())
+                })
             }
-        };
+        }?;
 
-        let result: f64 = self.o.operate(a, b);
-        return result;
+        let result: f64 = self.o.operate(a, b)?;
+        return Ok(result);
     }
 }
 
@@ -215,7 +222,6 @@ fn three_composer(tokens: Vec<Token>) -> Possible {
             let token = tokens[i].clone();
             if let Token::Operator(o) = token {
                 if version.1.clone().over(o.clone()) {
-                    println!("here");
                     let tokens_copy = tokens.clone();
                     let (mut a, mut b) = tokens_copy.split_at(i);
                     let a = Vec::from(a);
@@ -253,4 +259,64 @@ fn three_composer(tokens: Vec<Token>) -> Possible {
             three_composer(version.2)
         };
     Possible::expression(Expression::new(a, version.1, b))
+}
+
+pub fn post_process_paren(tokens: Vec<Token>) -> Result<Vec<Token>, String> {
+    let mut tokens = tokens;
+
+    // Post process parenthesis
+    let mut open = Vec::new();
+    let mut index_adjustment = 0;  // Track the adjustment in indices due to removals and insertions
+
+    for i in 0..tokens.len() {
+        let adjusted_index = i - index_adjustment;
+        let token = tokens[adjusted_index].clone();
+
+        if let Token::ParenOpen = token {
+            open.push(adjusted_index);
+        } else if let Token::ParenClose = token {
+            let start = match open.last() {
+                None => {return Err("Mismatched parenthesis [3]".into())}
+                Some(some) => {*some}
+            };
+            let end = adjusted_index;
+            let mut extracted: Vec<Token> = tokens.drain(start..=end).collect();
+
+            // Adjust indices for the removals
+            index_adjustment += extracted.len() - 1;
+
+            // Remove the first and last elements (parentheses)
+            extracted.pop();
+            extracted.remove(0);
+
+            // Insert the Paren token at the original start index
+            tokens.insert(start, Token::Paren(extracted));
+
+            open.pop();
+        }
+    }
+    // Check parentheses not in pair, in this case, throw an error
+    for token in &mut *tokens {
+        if Token::ParenOpen == *token || Token::ParenClose == *token {
+            panic!("Mismatched parentheses [2]")
+        }
+    }
+
+    //TODO not sure why that works
+    //Unwrap nested parentheses recursively
+    let mut i = 0;
+    while i < tokens.len() {
+        if let Token::Paren(inner_tokens) = &tokens[i] {
+            if inner_tokens.len() == 1 {
+                // Unwrap the nested parentheses
+                let nested_inner_tokens = inner_tokens[0].clone();
+                tokens[i] = nested_inner_tokens;
+                // Continue processing at the same index to handle multiple levels of nesting
+                continue;
+            }
+        }
+        i += 1;
+    }
+
+    Ok(tokens)
 }
