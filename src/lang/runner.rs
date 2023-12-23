@@ -1,9 +1,7 @@
 use std::collections::HashMap;
-use std::result;
-use crate::cli::LineResult;
-use crate::cli::LineResult::{Output};
 use crate::lang::calculator::calculate;
 use crate::lang::line_type::{construct_line_type, LineType};
+use crate::lang::LineResult;
 use crate::lang::tokenizer::{Operation, Token};
 use crate::lang::tokenizer::Token::Number;
 
@@ -52,7 +50,7 @@ pub fn run(memory: &mut HashMap<String, f64>, line_type: LineType) -> Result<Lin
                 for action in actions {
                     let lt = construct_line_type(action)?;
                     let result = run(memory, lt);
-                    if let Ok(Output(res)) = result {
+                    if let Ok(LineResult::Output(res)) = result {
                         println!("{}", res)
                     } else if let Err(err) = result {
                         println!("PROGRAM ERROR:\n{}", err);
@@ -71,7 +69,7 @@ pub fn run(memory: &mut HashMap<String, f64>, line_type: LineType) -> Result<Lin
                 for lt in &line_types {
                     //let lt = construct_line_type(action.clone())?;
                     let result = run(memory, lt.clone());
-                    if let Ok(Output(res)) = result {
+                    if let Ok(LineResult::Output(res)) = result {
                         println!("{}", res)
                     } else if let Err(err) = result {
                         println!("PROGRAM ERROR:\n{}", err);

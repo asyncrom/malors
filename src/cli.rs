@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::io;
 use std::io::Write;
 use std::time::Instant;
-use crate::cli::LineResult::{Output};
+use crate::lang::LineResult::*;
 use crate::lang::run_line;
 
 pub fn cli(memory: &mut HashMap<String, f64>) {
@@ -34,9 +34,4 @@ pub fn cli(memory: &mut HashMap<String, f64>) {
         }
     }
     println!("The End.")
-}
-
-pub enum LineResult {
-    Output(String),
-    Nothing
 }

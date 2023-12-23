@@ -4,7 +4,6 @@ mod calculator;
 mod line_type;
 
 use std::collections::HashMap;
-use crate::cli::LineResult;
 use crate::lang::line_type::construct_line_type;
 use crate::lang::runner::run;
 use crate::lang::tokenizer::tokenize2;
@@ -22,4 +21,9 @@ pub fn run_line(line: &str, memory: &mut HashMap<String, f64>) -> Result<LineRes
 
     // println!("{}", calculate(tokens));
     // LineResult::none()
+}
+
+pub enum LineResult {
+    Output(String),
+    Nothing
 }
