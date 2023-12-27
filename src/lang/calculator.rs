@@ -178,7 +178,7 @@ impl Expression {
             PossToken(tok) => {
                 Ok(match tok {
                     Number(num) => *num,
-                    _ => return Err("Invalid token in expression".into())
+                    _ => return Err(format!("Invalid token in expression {:?}", tok))
                 })
             }
         }?;
@@ -187,7 +187,7 @@ impl Expression {
             PossToken(tok) => {
                 Ok(match tok {
                     Number(num) => *num,
-                    _ => return Err("Invalid token in expression".into())
+                    _ => return Err(format!("Invalid token in expression {:?}", tok))
                 })
             }
         }?;

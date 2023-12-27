@@ -3,7 +3,7 @@ use crate::lang::calculator::calculate;
 use crate::lang::line_type::{construct_line_type, LineType};
 use crate::lang::LineResult;
 use crate::lang::tokenizer::{Operation, Token};
-use crate::lang::tokenizer::Token::Number;
+use crate::lang::tokenizer::Token::{Number, Paren};
 
 pub fn run(memory: &mut HashMap<String, f64>, line_type: LineType) -> Result<LineResult, String> {
     match line_type {
@@ -95,6 +95,8 @@ fn replace_var(memory: &mut HashMap<String, f64>, tokens : Vec<Token>) -> Result
             } {
 
             }
+        } else if let Paren(toks) = tokens.get(i).unwrap() {
+            tokens[i] = Paren(replace_var(memory, toks.clone())?)
         }
     }
     return Ok(tokens);
