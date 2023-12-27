@@ -9,7 +9,7 @@ mod lang;
 
 fn main() {
     // Initiate heap memory
-    let mut memory:HashMap<String, f64> =HashMap::new();
+    let mut memory:HashMap<String, f64> = HashMap::new();
 
     println!("Malors = Mathematic Logic from Rust.simplify()");
     // Get the command-line arguments

@@ -46,6 +46,7 @@ pub enum Operator {
     Multiply,
     Divide,
     Exponent,
+    Log,
     Factorial,
     None,
 }
@@ -64,6 +65,7 @@ impl Operator {
                 }
             }
             Operator::Exponent => Ok(a.powf(b)),
+            Operator::Log => Ok(a.log(b)),
             Operator::Factorial => Err("Factorials not supported for now".into()), //TODO
             Operator::None => Err("Inter: can't be none".into()) //TODO
         }
@@ -75,7 +77,7 @@ impl Operator {
 
     fn priority(&self) -> i32 {
         match self {
-            Operator::Exponent => 3,
+            Operator::Exponent  | Operator::Log => 3,
             Operator::Multiply | Operator::Divide => 2,
             Operator::Plus | Operator::Minus => 1,
             Operator::None => 4,
@@ -194,6 +196,7 @@ fn tokenize_special(name: String) -> Result<Token, String> {
         "*" => Token::Operator(Operator::Multiply),
         "/" => Token::Operator(Operator::Divide),
         "**" | "^" => Token::Operator(Operator::Exponent),
+        "//" => Token::Operator(Operator::Log),
 
         "==" => Token::Compare(Compare::Equal),
         "<" => Token::Compare(Compare::LessThan),
